@@ -1,0 +1,12 @@
+// This is a sample code for creating on new Task for the ESP32 MCU by using FreeRTOS.
+// Note that it uses xTaskCreatePinnedToCore() API, as we have the option of pinning this new task to a specific core of the dual-core ESP32
+ 
+  xTaskCreatePinnedToCore(
+                    taskOne,          /* Task function. */
+                    "TaskOne",        /* String with name of task. */
+                    10000,            /* Stack size in bytes. */
+                    NULL,             /* Parameter passed as input of the task */
+                    1,                /* Priority of the task. */
+                    NULL,             /* Task handle. */
+                    0);               /* Task pinned to core n . */
+ 
