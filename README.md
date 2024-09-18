@@ -1,5 +1,5 @@
-# AESD-Fall-2023-
-This is the companion repository for the codes of AESD course, Fall 2023 taught by Dr Usman Zabit at NUST-SEECS.
+# AESD-Fall-2024-
+This is the companion repository for the codes of AESD course, Fall 2024 taught by Dr Usman Zabit at NUST-SEECS.
 
 ## Embedded systems are everywhere, even on Mars 😄
 See the video on NASA's Perseverance rover, persevering on Mars :joy: 
