@@ -1,0 +1,91 @@
+/*
+ * Example of a basic FreeRTOS queue
+ * https://www.freertos.org/Embedded-RTOS-Queues.html
+ */
+
+// Modification of codes for ESP32 Demo.
+
+/* Declaring a global variable of type QueueHandle_t */
+QueueHandle_t integerQueue;
+
+void setup() {
+  Serial.begin(112500);   // Initialize the serial comm
+  delay(1000);
+
+  integerQueue = xQueueCreate(3, // Queue length
+                              sizeof(int) // Queue item size
+                              );
+  if (integerQueue != NULL) {
+    
+    // Create task that consumes the queue if it was created.
+    xTaskCreatePinnedToCore(vConsumerTask, // Task function
+                "Serial", // A name just for humans
+                10000,  // This stack size can be checked & adjusted by reading the Stack Highwater
+                NULL, 
+                2, // Priority
+                NULL,
+                0); // pinned to core 0
+
+
+    // Create task that publishes data in the queue if it was created.
+    xTaskCreatePinnedToCore(vSenderTask, // Task function
+                "SenderTask", // Task name
+                10000,  // Stack size
+                NULL, 
+                1, // Priority
+                NULL,
+                0); // pinned to core 0
+  }
+
+  xTaskCreatePinnedToCore(vPeriodicTask, // Task function
+              "vPeriodicTask", // Task name
+              10000, // Stack size 
+              NULL, 
+              1, // Priority
+              NULL ,
+                0); // pinned to core 0
+}
+
+void loop() {}  // Nothing here. All is done inside the Tasks
+
+
+void vSenderTask(void *pvParameters)
+{
+  int aValue = 0;  
+  for (;;)
+  {
+    for(int i = 0;i<10;i++ ){
+        aValue += 10000;
+    }
+    /* Post an item on a queue. https://www.freertos.org/a00117.html */
+    xQueueSend(integerQueue, &aValue, portMAX_DELAY);
+  }
+}
+
+/**
+ * Consumer task.
+ * Prints the received items from the queue to the serial monitor.
+ */
+void vConsumerTask(void * pvParameters) {
+  
+  int valueFromQueue = 0;
+
+  for (;;) 
+  {
+    /*  Read an item from the queue */
+    if (xQueueReceive(integerQueue, &valueFromQueue, portMAX_DELAY) == pdPASS) {
+      Serial.println(valueFromQueue);
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));    /* Delay/Block the Task for exactly X ms */
+  }
+}
+
+
+void vPeriodicTask(void *pvParameters)
+{
+  for (;;)
+  {
+      Serial.println("Running the Periodic Task");
+      vTaskDelay(pdMS_TO_TICKS(5000));    /* Delay/Block the Task for exactly 5000 ms */
+  }
+}
