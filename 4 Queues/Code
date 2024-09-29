@@ -9,7 +9,7 @@
 QueueHandle_t integerQueue;
 
 void setup() {
-  Serial.begin(112500);   // Initialize the serial comm
+  Serial.begin(115200);   // Initialize the serial comm
   delay(1000);
 
   integerQueue = xQueueCreate(3, // Queue length
