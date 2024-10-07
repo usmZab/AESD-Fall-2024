@@ -1,0 +1,49 @@
+/* Declaring a global variable of type SemaphoreHandle_t */
+SemaphoreHandle_t mutex;
+
+void setup() {
+  Serial.begin(112500);   // Initialize the serial comm
+  delay(1000);
+
+  mutex = xSemaphoreCreateMutex();
+  if (mutex != NULL) {
+    Serial.println("Mutex created");
+  }
+  xTaskCreate(TaskMutex, // Task function
+              "Task1", // Task name for humans
+              1000, 
+              (void *)1, // Task parameter
+              1, // Task priority
+              NULL);
+
+  xTaskCreate(TaskMutex, "Task2", 1000, (void *)10000, 1, NULL);
+}
+
+void loop() {}
+
+void TaskMutex(void *pvParameters) {
+  //int aValue = *((int*)pvParameters); // Use task parameters to pass value
+  int aValue = 10;
+  char * pcTaskName;
+  for (;;) {
+    for(int i = 0;i<3;i++ ) {
+       aValue += 1;   
+      if (xSemaphoreTake(mutex, 2000) == pdTRUE) {
+        pcTaskName = pcTaskGetTaskName(NULL);
+        Serial.print(pcTaskName); // Get task name
+        Serial.println( " has the mutex and is now running");
+        Serial.print(aValue);
+        Serial.println( " is the current value. Now, yielding itself.");
+        taskYIELD();        
+      }
+      else {
+        Serial.print(pcTaskGetTaskName(NULL)); // Get task name
+        Serial.println( " could not take mutex");
+      }
+    }  // end of inner for loop
+    
+    Serial.print(pcTaskGetTaskName(NULL)); // Get task name 
+    Serial.println( " is giving back the mutex");
+    xSemaphoreGive(mutex);
+  } //end of infinite for loop
+}
