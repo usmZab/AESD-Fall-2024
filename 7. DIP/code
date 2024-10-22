@@ -1,0 +1,96 @@
+/* Multi-tasking based Repeat Hardware Timer example
+ This example shows how to use hardware timer in ESP32. The timer calls onTimer
+ function every second. Also, this code shows how to perfrom Deferred Interrupt Processing. 
+ This code is a modified version of an example code which is in the public domain.
+ https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/Timer/RepeatTimer/RepeatTimer.ino
+ Usman Zabit: I changed "ARDUINO_ISR_ATTR" to "IRAM_ATTR" for onTimer() to place it in the IRAM.  */
+
+// Define a Timer Handle
+hw_timer_t * timer = NULL;
+
+volatile SemaphoreHandle_t timerSemaphore;
+
+// Define a Spinlock
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+// Global variables
+volatile uint32_t isrCounter = 0;
+volatile uint32_t lastIsrAt = 0;
+  
+// Interrupt Handler for Timer
+// As per ESP32 documentation, IRAM_ATTR is to be used for the Interrupt Handlers
+// to place these in the Instruction RAM.
+void IRAM_ATTR  onTimer(){
+  // Increment the counter and set the time of ISR
+  
+  portENTER_CRITICAL_ISR(&timerMux); // Enter Critical Section
+    isrCounter++;           // Write to Global Variables
+    lastIsrAt = millis();
+  portEXIT_CRITICAL_ISR(&timerMux);   // Exit Critical Section
+  
+  // Give a semaphore that we can check in the Task
+  // This enables Synchronization of our ISR with the corresponding Task
+  // to which the non-critical part of the ISR is deferred.
+  xSemaphoreGiveFromISR(timerSemaphore, NULL);
+}
+
+
+void setup() {
+  Serial.begin(112500);   // Initialize the serial comm
+  delay(1000);
+
+  // Create semaphore to inform us when the timer has fired
+  timerSemaphore = xSemaphoreCreateBinary();
+  
+  xTaskCreate( vTimerTask, "TimerTask", 1000, NULL , 1, NULL );
+  xTaskCreate(vPeriodicTask, "PeriodicTask", 1000, NULL, 2,NULL);
+
+  // Use 1st timer from 4 available timers (0,1,2,3).
+  // Set Prescaler to 80, i.e. Clk freq / 80. 3rd argument enables up-counting.
+  timer = timerBegin(0, 80, true);  
+
+  // Attach onTimer function (i.e. our Interrupt Handler or ISR) to our timer (hardware timer causing interrupt).
+  timerAttachInterrupt(timer, &onTimer, true); //3rd argument, true, indicates that we want the interrupt to be edge-type interrupt
+
+  // Set alarm to call onTimer function every second (value in microseconds).
+  timerAlarmWrite(timer, 2*1000000, true);  // Repeat the alarm (3rd parameter)
+  timerAlarmEnable(timer);   // Start an alarm
+}
+
+
+static void vTimerTask( void *pvParameters ) {
+  uint32_t isrCount = 0, isrTime = 0;
+  for( ;; ){  /* As per most tasks, this task is implemented within an infinite loop. */
+    // If Timer has fired
+    if (xSemaphoreTake(timerSemaphore, 10) == pdTRUE){  
+    //Sidenote: If blocking time = 0 then TWDT triggers. (WHY?)      
+      // Read the interrupt count and time
+      portENTER_CRITICAL(&timerMux);
+        isrCount = isrCounter;     // Read from the Global variables
+        isrTime = lastIsrAt;
+      portEXIT_CRITICAL(&timerMux);
+      // Print it
+      Serial.print("Hardware Timer triggered its ISR no. ");
+      Serial.print(isrCount); Serial.print(" at time ");
+      Serial.print(isrTime);  Serial.println(" ms");
+
+      //taskYIELD();  // If timerSemaphore's blocking time = 0 then 
+      // using taskYIELD does not prevent the TWDT from resetting! (WHY?) 
+    }
+  }
+}
+/*-----------------------------------------------------------*/
+
+void vPeriodicTask(void *pvParameters)
+{
+  for (;;)
+  {
+      Serial.println("Running the Periodic Task");
+      vTaskDelay(pdMS_TO_TICKS(5000));    /* Delay/Block the Task for exactly 5000 ms */
+  }
+}
+
+
+void loop() {
+    // Nothing here. All is done in Tasks
+}
